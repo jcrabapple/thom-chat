@@ -39,6 +39,7 @@ const reqBodySchema = z
 		session_token: z.string(),
 		conversation_id: z.string().optional(),
 		web_search_enabled: z.boolean().optional(),
+		web_search_mode: z.enum(['off', 'standard', 'deep']).optional(),
 		images: z
 			.array(
 				z.object({
@@ -189,6 +190,7 @@ async function generateAIResponse({
 	userSettingsData,
 	abortSignal,
 	reasoningEffort,
+	webSearchDepth,
 }: {
 	conversationId: string;
 	userId: string;
@@ -199,6 +201,7 @@ async function generateAIResponse({
 	userSettingsData: Doc<'user_settings'> | null;
 	abortSignal?: AbortSignal;
 	reasoningEffort?: 'low' | 'medium' | 'high';
+	webSearchDepth?: 'standard' | 'deep';
 }) {
 	log('Starting AI response generation in background', startTime);
 
@@ -241,7 +244,7 @@ async function generateAIResponse({
 	if (webSearchEnabled && lastUserMessage) {
 		log('Background: Performing web search', startTime);
 		try {
-			searchContext = await performNanoGPTWebSearch(lastUserMessage.content, apiKey);
+			searchContext = await performNanoGPTWebSearch(lastUserMessage.content, apiKey, webSearchDepth ?? 'standard');
 			log('Background: Web search completed', startTime);
 		} catch (e) {
 			log(`Background: Web search failed: ${e}`, startTime);
@@ -805,7 +808,9 @@ export const POST: RequestHandler = async ({ request }) => {
 			content: args.message,
 			role: 'user',
 			images: args.images ?? null,
-			webSearchEnabled: args.web_search_enabled ?? false,
+			webSearchEnabled: args.web_search_mode && args.web_search_mode !== 'off'
+				? true
+				: args.web_search_enabled ?? false,
 			createdAt: now,
 		});
 
@@ -843,7 +848,9 @@ export const POST: RequestHandler = async ({ request }) => {
 				modelId: args.model_id,
 				reasoningEffort: args.reasoning_effort,
 				images: args.images ?? null,
-				webSearchEnabled: args.web_search_enabled ?? false,
+				webSearchEnabled: args.web_search_mode && args.web_search_mode !== 'off'
+					? true
+					: args.web_search_enabled ?? false,
 				createdAt: new Date(),
 			});
 
@@ -1042,6 +1049,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		userSettingsData: userSettingsRecord ?? null,
 		abortSignal: abortController.signal,
 		reasoningEffort: args.reasoning_effort,
+		webSearchDepth: args.web_search_mode && args.web_search_mode !== 'off' ? args.web_search_mode : undefined,
 	})
 		.catch(async (error) => {
 			log(`Background AI response generation error: ${error}`, startTime);

@@ -25,7 +25,8 @@ export interface WebSearchResponse {
 
 export async function performNanoGPTWebSearch(
     query: string,
-    apiKey: string
+    apiKey: string,
+    depth: 'standard' | 'deep' = 'standard'
 ): Promise<string> {
     try {
         const response = await fetch(NANO_GPT_WEB_URL, {
@@ -36,6 +37,7 @@ export async function performNanoGPTWebSearch(
             },
             body: JSON.stringify({
                 query: query,
+                depth: depth,
                 outputType: 'searchResults',
             }),
         });

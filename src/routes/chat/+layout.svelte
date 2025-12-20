@@ -129,7 +129,7 @@
 				conversation_id: page.params.id ?? undefined,
 				model_id: settings.modelId,
 				images: imagesCopy.length > 0 ? imagesCopy : undefined,
-				web_search_enabled: settings.webSearchEnabled,
+				web_search_mode: settings.webSearchMode,
 				reasoning_effort: currentModelSupportsReasoning ? settings.reasoningEffort : undefined,
 			});
 
@@ -698,16 +698,29 @@
 										onlyImageModels={selectedImages.length > 0}
 									/>
 									<div class="flex items-center gap-1.5">
-										<button
-											type="button"
-											class={cn(
-												'bg-secondary/50 hover:bg-secondary text-muted-foreground flex size-8 items-center justify-center rounded-lg transition-colors',
-												settings.webSearchEnabled && 'bg-primary/20 text-primary border-primary/50'
-											)}
-											onclick={() => (settings.webSearchEnabled = !settings.webSearchEnabled)}
-										>
-											<SearchIcon class="size-4" />
-										</button>
+										<Tooltip>
+											{#snippet trigger(tooltip)}
+												<button
+													type="button"
+													class={cn(
+														'bg-secondary/50 hover:bg-secondary text-muted-foreground relative flex size-8 items-center justify-center rounded-lg transition-colors',
+														settings.webSearchMode === 'standard' && 'bg-primary/20 text-primary border-primary/50', settings.webSearchMode === 'deep' && 'bg-amber-500/20 text-amber-500 border-amber-500/50'
+													)}
+													onclick={() => {
+														if (settings.webSearchMode === 'off') settings.webSearchMode = 'standard';
+														else if (settings.webSearchMode === 'standard') settings.webSearchMode = 'deep';
+														else settings.webSearchMode = 'off';
+													}}
+													{...tooltip.trigger}
+												>
+													<SearchIcon class="size-4" />
+													{#if settings.webSearchMode === 'deep'}
+														<span class="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-amber-500"></span>
+													{/if}
+												</button>
+											{/snippet}
+											{settings.webSearchMode === 'off' ? 'Web Search: Off' : settings.webSearchMode === 'standard' ? 'Web Search: Standard ($0.006)' : 'Web Search: Deep ($0.06)'}
+										</Tooltip>
 										{#if currentModelSupportsImages}
 											<button
 												type="button"
