@@ -1,6 +1,7 @@
 <script lang="ts">
-	import { useCachedQuery, api } from '$lib/cache/cached-query.svelte';
+	import { useCachedQuery, api, invalidateQueryPattern } from '$lib/cache/cached-query.svelte';
 	import { session } from '$lib/state/session.svelte';
+	import { goto } from '$app/navigation';
 	import { ResultAsync } from 'neverthrow';
 	import { mutate } from '$lib/client/mutation.svelte';
 	import { Switch } from '$lib/components/ui/switch';
@@ -14,8 +15,10 @@
 		Title as CardTitle
 	} from '$lib/components/ui/card';
 	import PasskeySettings from '$lib/components/account/PasskeySettings.svelte';
+	import { callModal } from '$lib/components/ui/modal/global-modal.svelte';
 	import ChevronDown from '~icons/lucide/chevron-down';
 	import ChevronRight from '~icons/lucide/chevron-right';
+	import Trash2 from '~icons/lucide/trash-2';
 
 	let { data } = $props();
 	const settings = useCachedQuery(api.user_settings.get, {});
@@ -31,6 +34,8 @@
 	let karakeepTestStatus = $state<'idle' | 'testing' | 'success' | 'error'>('idle');
 	let karakeepTestMessage = $state('');
 	let karakeepExpanded = $state(false);
+	let deleteAllChatsExpanded = $state(false);
+	let deleteAllChatsDeleting = $state(false);
 
 	$effect(() => {
 		if (settings.data?.karakeepUrl) karakeepUrl = settings.data.karakeepUrl;
@@ -144,6 +149,55 @@
 		} catch (error) {
 			karakeepTestStatus = 'error';
 			karakeepTestMessage = `Connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
+		}
+	}
+
+	async function deleteAllChats() {
+		const res = await callModal({
+			title: 'Delete All Chats',
+			description: 'Are you sure you want to delete all your conversations? This action cannot be undone and will permanently delete all conversations and their associated messages.',
+			actions: { cancel: 'outline', delete: 'destructive' },
+		});
+
+		if (res !== 'delete') return;
+
+		if (!session.current?.session.token) return;
+
+		deleteAllChatsDeleting = true;
+
+		try {
+			const response = await fetch(api.conversations.deleteAll.url, {
+				method: 'DELETE',
+				credentials: 'include',
+			});
+
+			if (!response.ok) {
+				throw new Error(`Failed to delete all chats: ${response.status} ${response.statusText}`);
+			}
+
+			// Invalidate both conversations and messages cache so the sidebar updates immediately
+			invalidateQueryPattern(api.conversations.get.url);
+			invalidateQueryPattern(api.messages.getAllFromConversation.url);
+
+			// Navigate to /chat to avoid stale conversation URL
+			await goto('/chat');
+
+			// Show success feedback
+			await callModal({
+				title: 'Success',
+				description: 'All conversations have been deleted successfully.',
+				actions: { ok: 'default' },
+			});
+		} catch (error) {
+			console.error('Failed to delete all chats:', error);
+			// Show error feedback
+			await callModal({
+				title: 'Error',
+				description: error instanceof Error ? error.message : 'Failed to delete all chats. Please try again.',
+				actions: { ok: 'default' },
+			});
+		} finally {
+			deleteAllChatsDeleting = false;
 		}
 	}
 </script>
@@ -271,6 +325,69 @@
 						{karakeepTestMessage}
 					</div>
 				{/if}
+			</CardContent>
+		{/if}
+	</Card>
+
+	<!-- Delete All Chats Section (Collapsible) -->
+	<Card>
+		<button
+			type="button"
+			class="w-full text-left"
+			onclick={() => deleteAllChatsExpanded = !deleteAllChatsExpanded}
+		>
+			<CardHeader class="cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg">
+				<div class="flex items-center justify-between">
+					<div>
+						<CardTitle class="text-destructive">Delete All Chats</CardTitle>
+						<CardDescription>
+							Permanently delete all your conversations and messages.
+						</CardDescription>
+					</div>
+					<div class="text-muted-foreground">
+						{#if deleteAllChatsExpanded}
+							<ChevronDown class="h-5 w-5" />
+						{:else}
+							<ChevronRight class="h-5 w-5" />
+						{/if}
+					</div>
+				</div>
+			</CardHeader>
+		</button>
+		
+		{#if deleteAllChatsExpanded}
+			<CardContent class="pt-0">
+				<div class="flex flex-col gap-4">
+					<div class="rounded-md border border-destructive/50 bg-destructive/10 p-4">
+						<div class="flex items-start gap-3">
+							<Trash2 class="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+							<div class="flex flex-col gap-2">
+								<p class="font-medium text-destructive">Warning: This action cannot be undone</p>
+								<p class="text-sm text-muted-foreground">
+									This will permanently delete:
+								</p>
+								<ul class="text-sm text-muted-foreground list-disc list-inside space-y-1 ml-1">
+									<li>All your conversations</li>
+									<li>All messages within those conversations</li>
+									<li>Any associated data and context</li>
+								</ul>
+							</div>
+						</div>
+					</div>
+					
+					<Button
+						variant="destructive"
+						onclick={deleteAllChats}
+						disabled={deleteAllChatsDeleting}
+						class="w-full sm:w-auto"
+					>
+						{#if deleteAllChatsDeleting}
+							Deleting...
+						{:else}
+							Delete All Chats
+						{/if}
+					</Button>
+				</div>
 			</CardContent>
 		{/if}
 	</Card>

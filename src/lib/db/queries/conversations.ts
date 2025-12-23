@@ -219,6 +219,11 @@ export async function deleteConversation(conversationId: string, userId: string)
     await db.delete(conversations).where(eq(conversations.id, conversationId));
 }
 
+export async function deleteAllConversations(userId: string): Promise<void> {
+    // Messages will be cascade deleted due to foreign key constraint
+    await db.delete(conversations).where(eq(conversations.userId, userId));
+}
+
 export async function getConversationMessages(
     conversationId: string,
     userId: string

@@ -13,6 +13,7 @@ import {
     setConversationPublic,
     toggleConversationPin,
     deleteConversation,
+    deleteAllConversations,
     searchConversations,
 } from '$lib/db/queries';
 
@@ -107,10 +108,16 @@ export const POST: RequestHandler = async ({ request }) => {
     }
 };
 
-// DELETE - delete conversation
+// DELETE - delete conversation or all conversations
 export const DELETE: RequestHandler = async ({ request, url }) => {
     const userId = await getSessionUserId(request);
     const conversationId = url.searchParams.get('id');
+    const deleteAll = url.searchParams.get('all');
+
+    if (deleteAll === 'true') {
+        await deleteAllConversations(userId);
+        return json({ ok: true });
+    }
 
     if (!conversationId) {
         return error(400, 'Missing conversation id');

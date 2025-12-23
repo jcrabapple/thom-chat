@@ -41,6 +41,7 @@ export const api = {
         create: `${API_BASE}/conversations`,
         search: (term: string, mode?: string) =>
             `${API_BASE}/conversations?search=${encodeURIComponent(term)}${mode ? `&mode=${mode}` : ''}`,
+        deleteAll: `${API_BASE}/conversations?all=true`,
     },
     messages: {
         getAllFromConversation: (conversationId: string) =>
