@@ -1265,7 +1265,7 @@ export const POST: RequestHandler = async ({ request }) => {
 				}
 
 				const storageId = generateId();
-				const extension = mimeType.split('/')[1] || 'png';
+				const extension = (mimeType.split('/')[1] || 'png').replace(/[^a-zA-Z0-9]/g, '') || 'png';
 				const filename = `${storageId}.${extension}`;
 				const filepath = join(UPLOAD_DIR, filename);
 

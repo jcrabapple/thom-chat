@@ -30,7 +30,7 @@ export const POST: RequestHandler = async ({ request }) => {
     const body = await request.arrayBuffer();
 
     const id = generateId();
-    const extension = contentType.split('/')[1] || 'bin';
+    const extension = (contentType.split('/')[1] || 'bin').replace(/[^a-zA-Z0-9]/g, '') || 'bin';
     const filename = `${id}.${extension}`;
     const filepath = join(UPLOAD_DIR, filename);
 
