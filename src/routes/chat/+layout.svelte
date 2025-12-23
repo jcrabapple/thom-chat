@@ -7,6 +7,7 @@ import { extractUrlsByType } from '$lib/backend/url-scraper';
 	import AppSidebar from '$lib/components/app-sidebar.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { ImageModal } from '$lib/components/ui/image-modal';
+import { DocumentModal } from '$lib/components/ui/document-modal';
 	import { LightSwitch } from '$lib/components/ui/light-switch/index.js';
 	import { ShareButton } from '$lib/components/ui/share-button';
 	import { ExportButton } from '$lib/components/ui/export-button';
@@ -19,8 +20,9 @@ import { extractUrlsByType } from '$lib/backend/url-scraper';
 	import { session } from '$lib/state/session.svelte.js';
 	import { settings } from '$lib/state/settings.svelte.js';
 	import { Provider } from '$lib/types';
-	import { compressImage } from '$lib/utils/image-compression';
-	import { supportsImages, supportsReasoning } from '$lib/utils/model-capabilities';
+import { compressImage } from '$lib/utils/image-compression';
+import { supportsImages, supportsReasoning, supportsDocuments } from '$lib/utils/model-capabilities';
+import { validateFiles, getFileType } from '$lib/utils/file-validation';
 	import { omit, pick } from '$lib/utils/object.js';
 	import { cn } from '$lib/utils/utils.js';
 	import { mutate } from '$lib/client/mutation.svelte';
@@ -34,8 +36,9 @@ import { extractUrlsByType } from '$lib/backend/url-scraper';
 	import SearchIcon from '~icons/lucide/search';
 	import Settings2Icon from '~icons/lucide/settings-2';
 	import StopIcon from '~icons/lucide/square';
-	import UploadIcon from '~icons/lucide/upload';
-	import XIcon from '~icons/lucide/x';
+import UploadIcon from '~icons/lucide/upload';
+import XIcon from '~icons/lucide/x';
+import PaperclipIcon from '~icons/lucide/paperclip';
 	import { callCancelGeneration } from '../api/cancel-generation/call.js';
 	import { callGenerateMessage } from '../api/generate-message/call.js';
 	import { ModelPicker } from '$lib/components/model-picker';
@@ -56,14 +59,20 @@ import { extractUrlsByType } from '$lib/backend/url-scraper';
 	let textarea = $state<HTMLTextAreaElement>();
 	let abortController = $state<AbortController | null>(null);
 
+	// Get restrictions from page data (for server key users)
+	const restrictions = $derived(page.data?.restrictions);
 
 	$effect(() => {
 		// Enable initial models for new users
-		mutate(api.user_enabled_models.enable_initial.url, {
-			action: 'enableInitial',
-		}, {
-			invalidatePatterns: [api.user_enabled_models.get_enabled.url]
-		});
+		mutate(
+			api.user_enabled_models.enable_initial.url,
+			{
+				action: 'enableInitial',
+			},
+			{
+				invalidatePatterns: [api.user_enabled_models.get_enabled.url],
+			}
+		);
 	});
 
 	const assistantsQuery = useCachedQuery(api.assistants.list, {
@@ -89,23 +98,25 @@ import { extractUrlsByType } from '$lib/backend/url-scraper';
 
 	// Apply assistant defaults when switching assistants
 	let previousAssistantId = $state<string | null>(null);
-	
+
 	$effect(() => {
 		const currentId = selectedAssistantId.current;
 		const assistant = selectedAssistant;
-		
+
 		// Only apply defaults when actually switching to a different assistant
 		if (currentId && currentId !== previousAssistantId && assistant) {
 			previousAssistantId = currentId;
-			
+
 			// Apply model if configured (don't reset model if not configured)
 			if (assistant.defaultModelId) {
 				settings.modelId = assistant.defaultModelId;
 			}
-			
+
 			// Apply search settings - reset to defaults if not configured
-			settings.webSearchMode = (assistant.defaultWebSearchMode as 'off' | 'standard' | 'deep') || 'off';
-			settings.webSearchProvider = (assistant.defaultWebSearchProvider as 'linkup' | 'tavily') || 'linkup';
+			settings.webSearchMode =
+				(assistant.defaultWebSearchMode as 'off' | 'standard' | 'deep') || 'off';
+			settings.webSearchProvider =
+				(assistant.defaultWebSearchProvider as 'linkup' | 'tavily' | 'exa') || 'linkup';
 		}
 	});
 
@@ -114,8 +125,8 @@ import { extractUrlsByType } from '$lib/backend/url-scraper';
 	}));
 
 	const isGenerating = $derived(
-		Boolean(currentConversationQuery.data?.generating) || 
-		(page.params.id ? currentConversationQuery.isLoading : false)
+		Boolean(currentConversationQuery.data?.generating) ||
+			(page.params.id ? currentConversationQuery.isLoading : false)
 	);
 
 	async function stopGeneration() {
@@ -193,7 +204,9 @@ import { extractUrlsByType } from '$lib/backend/url-scraper';
 		loading = true;
 
 		const imagesCopy = [...selectedImages];
+		const documentsCopy = [...selectedDocuments];
 		selectedImages = [];
+		selectedDocuments = [];
 
 		try {
 			const res = await callGenerateMessage({
@@ -202,6 +215,7 @@ import { extractUrlsByType } from '$lib/backend/url-scraper';
 				conversation_id: page.params.id ?? undefined,
 				model_id: settings.modelId,
 				images: imagesCopy.length > 0 ? imagesCopy : undefined,
+				documents: documentsCopy.length > 0 ? documentsCopy : undefined,
 				web_search_mode: settings.webSearchMode,
 				web_search_provider: settings.webSearchProvider,
 				assistant_id: selectedAssistantId.current || undefined,
@@ -231,7 +245,6 @@ import { extractUrlsByType } from '$lib/backend/url-scraper';
 			message.current = '';
 		}
 	}
-
 
 	let abortEnhance: AbortController | null = $state(null);
 
@@ -293,12 +306,22 @@ import { extractUrlsByType } from '$lib/backend/url-scraper';
 		},
 	});
 	let selectedImages = $state<{ url: string; storage_id: string; fileName?: string }[]>([]);
+	let selectedDocuments = $state<{ url: string; storage_id: string; fileName?: string; fileType: 'pdf' | 'markdown' | 'text' }[]>([]);
 	let isUploading = $state(false);
+	let isUploadingDocuments = $state(false);
 	let fileInput = $state<HTMLInputElement>();
+	let documentInput = $state<HTMLInputElement>();
 	let imageModal = $state<{ open: boolean; imageUrl: string; fileName: string }>({
 		open: false,
 		imageUrl: '',
 		fileName: '',
+	});
+
+	let documentModal = $state<{ open: boolean; documentUrl: string; fileName: string; fileType: 'pdf' | 'markdown' | 'text'; content: string }>({
+		open: false,
+		documentUrl: '',
+		fileName: '',
+		content: '',
 	});
 
 	usePrompt(
@@ -320,10 +343,29 @@ import { extractUrlsByType } from '$lib/backend/url-scraper';
 		return supportsReasoning(currentModel);
 	});
 
+	const currentModelSupportsDocuments = $derived.by(() => {
+		// For now, always show document support for testing
+		// TODO: Make this model-specific when models are properly configured
+		return true;
+		
+		// Original logic (commented out for testing):
+		// if (!settings.modelId) return false;
+		// const nanoGPTModels = models.from(Provider.NanoGPT);
+		// const currentModel = nanoGPTModels.find((m) => m.id === settings.modelId);
+		// if (!currentModel) return false;
+		// return supportsDocuments(currentModel);
+	});
+
 	const fileUpload = new FileUpload({
 		multiple: true,
 		accept: 'image/*',
 		maxSize: 10 * 1024 * 1024, // 10MB
+	});
+
+	const documentUpload = new FileUpload({
+		multiple: true,
+		accept: '.pdf,.md,.markdown,.txt',
+		maxSize: 20 * 1024 * 1024, // 20MB
 	});
 
 	async function handleFileChange(files: File[]) {
@@ -372,8 +414,60 @@ import { extractUrlsByType } from '$lib/backend/url-scraper';
 		}
 	}
 
+	async function handleDocumentChange(files: File[]) {
+		if (!files.length || !session.current?.session.token) return;
+
+		isUploadingDocuments = true;
+		const uploadedFiles: { url: string; storage_id: string; fileName?: string; fileType: 'pdf' | 'markdown' | 'text' }[] = [];
+
+		try {
+			// Validate files
+			const validation = validateFiles(files, ['pdf', 'markdown', 'text']);
+			
+			if (validation.errors.length > 0) {
+				console.error('File validation errors:', validation.errors);
+				// TODO: Show user-friendly error messages
+				return;
+			}
+
+			for (const file of validation.validFiles) {
+				const fileType = getFileType(file) as 'pdf' | 'markdown' | 'text';
+
+				// Upload file to local storage API
+				const uploadResult = await fetch('/api/storage', {
+					method: 'POST',
+					headers: {
+						'Content-Type': file.type,
+					},
+					credentials: 'include',
+					body: file,
+				});
+
+				if (!uploadResult.ok) {
+					throw new Error(`Upload failed: ${uploadResult.statusText}`);
+				}
+
+				const { storageId, url } = await uploadResult.json();
+
+				if (url) {
+					uploadedFiles.push({ url, storage_id: storageId, fileName: file.name, fileType });
+				}
+			}
+
+			selectedDocuments = [...selectedDocuments, ...uploadedFiles];
+		} catch (error) {
+			console.error('Document upload failed:', error);
+		} finally {
+			isUploadingDocuments = false;
+		}
+	}
+
 	function removeImage(index: number) {
 		selectedImages = selectedImages.filter((_, i) => i !== index);
+	}
+
+	function removeDocument(index: number) {
+		selectedDocuments = selectedDocuments.filter((_, i) => i !== index);
 	}
 
 	function openImageModal(imageUrl: string, fileName: string) {
@@ -384,10 +478,42 @@ import { extractUrlsByType } from '$lib/backend/url-scraper';
 		};
 	}
 
+	async function openDocumentModal(documentUrl: string, fileName: string, fileType: 'pdf' | 'markdown' | 'text') {
+		let content = '';
+		
+		// For text and markdown files, fetch the content
+		if (fileType === 'markdown' || fileType === 'text') {
+			try {
+				const response = await fetch(documentUrl);
+				if (response.ok) {
+					content = await response.text();
+				}
+			} catch (error) {
+				console.error('Failed to fetch document content:', error);
+				content = 'Failed to load document content.';
+			}
+		}
+
+		documentModal = {
+			open: true,
+			documentUrl,
+			fileName,
+			fileType,
+			content,
+		};
+	}
+
 	$effect(() => {
 		if (fileUpload.selected.size > 0) {
 			handleFileChange(Array.from(fileUpload.selected));
 			fileUpload.clear();
+		}
+	});
+
+	$effect(() => {
+		if (documentUpload.selected.size > 0) {
+			handleDocumentChange(Array.from(documentUpload.selected));
+			documentUpload.clear();
 		}
 	});
 
@@ -520,10 +646,7 @@ import { extractUrlsByType } from '$lib/backend/url-scraper';
 
 <svelte:head>
 	<title>Chat | not t3.chat</title>
-	<meta
-		name="viewport"
-		content="width=device-width, initial-scale=1, viewport-fit=cover"
-	/>
+	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 </svelte:head>
 
 <svelte:window
@@ -534,11 +657,12 @@ import { extractUrlsByType } from '$lib/backend/url-scraper';
 	bind:open={sidebarOpen}
 	class="bg-sidebar fill-device-height overflow-clip"
 	{...currentModelSupportsImages ? omit(fileUpload.dropzone, ['onclick']) : {}}
+		{...omit(documentUpload.dropzone, ['onclick'])}
 >
 	<AppSidebar bind:searchModalOpen />
 
 	<Sidebar.Inset
-		class="bg-background relative flex min-h-svh flex-1 flex-col overflow-clip md:m-2 md:rounded-2xl md:border md:border-border"
+		class="bg-background md:border-border relative flex min-h-svh flex-1 flex-col overflow-clip md:m-2 md:rounded-2xl md:border"
 	>
 		{#if !sidebarOpen}
 			<!-- header - top left -->
@@ -630,14 +754,16 @@ import { extractUrlsByType } from '$lib/backend/url-scraper';
 			</div>
 
 			<div
-				class="group absolute bottom-4 left-0 right-0 mx-auto mt-auto flex w-full max-w-3xl flex-col gap-1 px-4"
+				class="group absolute right-0 bottom-4 left-0 mx-auto mt-auto flex w-full max-w-3xl flex-col gap-1 px-4"
 				bind:this={textareaWrapper}
 			>
-				<div class="mb-2 text-center text-[10px] text-muted-foreground/60">
-					Powered by <a href="https://nano-gpt.com" class="underline hover:text-foreground">Nano-GPT</a>
+				<div class="text-muted-foreground/60 mb-2 text-center text-[10px]">
+					Powered by <a href="https://nano-gpt.com" class="hover:text-foreground underline"
+						>Nano-GPT</a
+					>
 				</div>
 				<div
-					class="bg-secondary/40 rounded-2xl p-2.5 backdrop-blur-xl border border-border shadow-2xl"
+					class="bg-secondary/40 border-border rounded-2xl border p-2.5 shadow-2xl backdrop-blur-xl"
 				>
 					<form
 						class="relative flex w-full flex-col items-stretch gap-2 transition duration-200"
@@ -702,7 +828,7 @@ import { extractUrlsByType } from '$lib/backend/url-scraper';
 							</div>
 						{/if}
 						<div class="flex flex-grow flex-col">
-							{#if selectedImages.length > 0}
+							{#if selectedImages.length > 0 || selectedDocuments.length > 0}
 								<div class="mb-2 flex flex-wrap gap-2 px-2 pt-2">
 									{#each selectedImages as image, index (image.storage_id)}
 										<div
@@ -722,6 +848,32 @@ import { extractUrlsByType } from '$lib/backend/url-scraper';
 											<button
 												type="button"
 												onclick={() => removeImage(index)}
+												class="bg-destructive text-destructive-foreground absolute -top-1.5 -right-1.5 cursor-pointer rounded-full p-1 opacity-0 shadow-sm transition group-hover:opacity-100"
+											>
+												<XIcon class="h-3 w-3" />
+											</button>
+										</div>
+									{/each}
+									{#each selectedDocuments as document, index (document.storage_id)}
+										<div
+											class="group border-border bg-muted relative flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border p-1 transition-all"
+										>
+											<button
+												type="button"
+												onclick={() => openDocumentModal(document.url, document.fileName || 'document', document.fileType)}
+												class="flex size-full flex-col items-center justify-center rounded-lg bg-secondary/50 transition-opacity hover:opacity-80"
+											>
+												{#if document.fileType === 'pdf'}
+													<span class="text-2xl">📄</span>
+												{:else if document.fileType === 'markdown'}
+													<span class="text-2xl">📝</span>
+												{:else if document.fileType === 'text'}
+													<span class="text-2xl">📄</span>
+												{/if}
+											</button>
+											<button
+												type="button"
+												onclick={() => removeDocument(index)}
 												class="bg-destructive text-destructive-foreground absolute -top-1.5 -right-1.5 cursor-pointer rounded-full p-1 opacity-0 transition group-hover:opacity-100 shadow-sm"
 											>
 												<XIcon class="h-3 w-3" />
@@ -732,6 +884,7 @@ import { extractUrlsByType } from '$lib/backend/url-scraper';
 							{/if}
 							<div class="relative flex flex-grow flex-row items-start">
 								<input {...fileUpload.input} bind:this={fileInput} />
+								<input {...documentUpload.input} bind:this={documentInput} />
 								<textarea
 									{...pick(popover.trigger, ['id', 'style', 'onfocusout', 'onfocus'])}
 									bind:this={textarea}
@@ -789,7 +942,9 @@ import { extractUrlsByType } from '$lib/backend/url-scraper';
 												class="bg-secondary/50 hover:bg-secondary text-muted-foreground flex h-9 items-center justify-center gap-2 rounded-lg px-2.5 transition-colors"
 											>
 												<BotIcon class="size-4" />
-												<span class="text-sm max-w-[100px] truncate">{selectedAssistant?.name ?? 'Assistant'}</span>
+												<span class="max-w-[100px] truncate text-sm"
+													>{selectedAssistant?.name ?? 'Assistant'}</span
+												>
 											</DropdownMenu.Trigger>
 											<DropdownMenu.Content>
 												<DropdownMenu.Group>
@@ -813,48 +968,76 @@ import { extractUrlsByType } from '$lib/backend/url-scraper';
 										</DropdownMenu.Root>
 									{/if}
 									<div class="flex items-center gap-1.5">
-										<Tooltip>
-											{#snippet trigger(tooltip)}
-												<button
-													type="button"
-													class={cn(
-														'bg-secondary/50 hover:bg-secondary text-muted-foreground relative flex size-8 items-center justify-center rounded-lg transition-colors',
-														settings.webSearchMode === 'standard' && 'bg-primary/20 text-primary border-primary/50', settings.webSearchMode === 'deep' && 'bg-amber-500/20 text-amber-500 border-amber-500/50'
-													)}
-													onclick={() => {
-														if (settings.webSearchMode === 'off') settings.webSearchMode = 'standard';
-														else if (settings.webSearchMode === 'standard') settings.webSearchMode = 'deep';
-														else settings.webSearchMode = 'off';
-													}}
-													{...tooltip.trigger}
-												>
-													<SearchIcon class="size-4" />
-													{#if settings.webSearchMode === 'deep'}
-														<span class="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-amber-500"></span>
-													{/if}
-												</button>
-											{/snippet}
-											{settings.webSearchMode === 'off' ? 'Web Search: Off' : settings.webSearchMode === 'standard' ? 'Web Search: Standard ($0.006)' : 'Web Search: Deep ($0.06)'}
-										</Tooltip>
-										{#if settings.webSearchMode !== 'off'}
+										{#if !restrictions?.webDisabled}
 											<Tooltip>
 												{#snippet trigger(tooltip)}
 													<button
 														type="button"
 														class={cn(
-															'bg-secondary/50 hover:bg-secondary text-muted-foreground flex h-8 items-center justify-center rounded-lg px-2 text-xs font-medium transition-colors',
-															settings.webSearchProvider === 'tavily' && 'bg-purple-500/20 text-purple-400'
+															'bg-secondary/50 hover:bg-secondary text-muted-foreground relative flex size-8 items-center justify-center rounded-lg transition-colors',
+															settings.webSearchMode === 'standard' &&
+																'bg-primary/20 text-primary border-primary/50',
+															settings.webSearchMode === 'deep' &&
+																'border-amber-500/50 bg-amber-500/20 text-amber-500'
 														)}
 														onclick={() => {
-															settings.webSearchProvider = settings.webSearchProvider === 'linkup' ? 'tavily' : 'linkup';
+															if (settings.webSearchMode === 'off')
+																settings.webSearchMode = 'standard';
+															else if (settings.webSearchMode === 'standard')
+																settings.webSearchMode = 'deep';
+															else settings.webSearchMode = 'off';
 														}}
 														{...tooltip.trigger}
 													>
-														{settings.webSearchProvider === 'linkup' ? 'Linkup' : 'Tavily'}
+														<SearchIcon class="size-4" />
+														{#if settings.webSearchMode === 'deep'}
+															<span
+																class="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-amber-500"
+															></span>
+														{/if}
 													</button>
 												{/snippet}
-												{settings.webSearchProvider === 'linkup' ? 'Using Linkup (default). Click to switch to Tavily.' : 'Using Tavily. Click to switch to Linkup.'}
+												{settings.webSearchMode === 'off'
+													? 'Web Search: Off'
+													: settings.webSearchMode === 'standard'
+														? 'Web Search: Standard ($0.006)'
+														: 'Web Search: Deep ($0.06)'}
 											</Tooltip>
+											{#if settings.webSearchMode !== 'off'}
+												<Tooltip>
+													{#snippet trigger(tooltip)}
+														<button
+															type="button"
+															class={cn(
+																'bg-secondary/50 hover:bg-secondary text-muted-foreground flex h-8 items-center justify-center rounded-lg px-2 text-xs font-medium transition-colors',
+																settings.webSearchProvider === 'tavily' &&
+																	'bg-purple-500/20 text-purple-400',
+																settings.webSearchProvider === 'exa' &&
+																	'bg-blue-500/20 text-blue-400'
+															)}
+															onclick={() => {
+																if (settings.webSearchProvider === 'linkup')
+																	settings.webSearchProvider = 'tavily';
+																else if (settings.webSearchProvider === 'tavily')
+																	settings.webSearchProvider = 'exa';
+																else settings.webSearchProvider = 'linkup';
+															}}
+															{...tooltip.trigger}
+														>
+															{settings.webSearchProvider === 'linkup'
+																? 'Linkup'
+																: settings.webSearchProvider === 'tavily'
+																	? 'Tavily'
+																	: 'Exa'}
+														</button>
+													{/snippet}
+													{settings.webSearchProvider === 'linkup'
+														? 'Using Linkup (default). Click to switch.'
+														: settings.webSearchProvider === 'tavily'
+															? 'Using Tavily. Click to switch.'
+															: 'Using Exa. Click to switch.'}
+												</Tooltip>
+											{/if}
 										{/if}
 										{#if currentModelSupportsImages}
 											<button
@@ -872,14 +1055,33 @@ import { extractUrlsByType } from '$lib/backend/url-scraper';
 												{/if}
 											</button>
 										{/if}
+										{#if currentModelSupportsDocuments}
+											<button
+												type="button"
+												class="bg-secondary/50 hover:bg-secondary text-muted-foreground flex size-8 items-center justify-center rounded-lg transition-colors disabled:opacity-50"
+												onclick={() => documentInput?.click()}
+												disabled={isUploadingDocuments}
+											>
+												{#if isUploadingDocuments}
+													<div
+														class="size-3 animate-spin rounded-full border-2 border-current border-t-transparent"
+													></div>
+												{:else}
+													<PaperclipIcon class="size-4" />
+												{/if}
+											</button>
+										{/if}
 										{#if currentModelSupportsReasoning}
 											<button
 												type="button"
 												class={cn(
 													'bg-secondary/50 hover:bg-secondary text-muted-foreground flex size-8 items-center justify-center rounded-lg transition-colors',
-													settings.reasoningEffort !== 'low' && 'bg-primary/20 text-primary border-primary/50'
+													settings.reasoningEffort !== 'low' &&
+														'bg-primary/20 text-primary border-primary/50'
 												)}
-												onclick={() => (settings.reasoningEffort = settings.reasoningEffort === 'low' ? 'medium' : 'low')}
+												onclick={() =>
+													(settings.reasoningEffort =
+														settings.reasoningEffort === 'low' ? 'medium' : 'low')}
 											>
 												<BrainIcon class="size-4" />
 											</button>
@@ -893,7 +1095,7 @@ import { extractUrlsByType } from '$lib/backend/url-scraper';
 												type={isGenerating ? 'button' : 'submit'}
 												onclick={isGenerating ? stopGeneration : undefined}
 												disabled={isGenerating ? false : !message.current.trim()}
-												class="bg-primary text-primary-foreground hover:opacity-90 active:scale-95 flex size-8 items-center justify-center rounded-lg shadow-lg transition-all disabled:cursor-not-allowed disabled:opacity-50 disabled:scale-100"
+												class="bg-primary text-primary-foreground flex size-8 items-center justify-center rounded-lg shadow-lg transition-all hover:opacity-90 active:scale-95 disabled:scale-100 disabled:cursor-not-allowed disabled:opacity-50"
 												{...tooltip.trigger}
 											>
 												{#if isGenerating}
@@ -911,17 +1113,15 @@ import { extractUrlsByType } from '$lib/backend/url-scraper';
 					</form>
 				</div>
 			</div>
-
-
 		</div>
 	</Sidebar.Inset>
 
-	{#if fileUpload.isDragging && currentModelSupportsImages}
+	{#if (fileUpload.isDragging || documentUpload.isDragging) && (currentModelSupportsImages || currentModelSupportsDocuments)}
 		<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/10 backdrop-blur-sm">
 			<div class="text-center">
 				<UploadIcon class="text-primary mx-auto mb-4 h-16 w-16" />
-				<p class="text-xl font-semibold">Add image</p>
-				<p class="mt-2 text-sm opacity-75">Drop an image here to attach it to your message.</p>
+				<p class="text-xl font-semibold">Add files</p>
+				<p class="mt-2 text-sm opacity-75">Drop images or documents (PDF, Markdown, Text) here to attach them to your message.</p>
 			</div>
 		</div>
 	{/if}
@@ -930,6 +1130,14 @@ import { extractUrlsByType } from '$lib/backend/url-scraper';
 		bind:open={imageModal.open}
 		imageUrl={imageModal.imageUrl}
 		fileName={imageModal.fileName}
+	/>
+
+	<DocumentModal
+		bind:open={documentModal.open}
+		documentUrl={documentModal.documentUrl}
+		fileName={documentModal.fileName}
+		fileType={documentModal.fileType}
+		content={documentModal.content}
 	/>
 </Sidebar.Root>
 

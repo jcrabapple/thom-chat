@@ -88,6 +88,8 @@ export const userSettings = sqliteTable(
         persistentMemoryEnabled: integer('persistent_memory_enabled', { mode: 'boolean' }).notNull().default(false),
         youtubeTranscriptsEnabled: integer('youtube_transcripts_enabled', { mode: 'boolean' }).notNull().default(false),
         freeMessagesUsed: integer('free_messages_used').default(0),
+        dailyMessagesUsed: integer('daily_messages_used').default(0),
+        lastMessageDate: text('last_message_date'), // ISO date string (YYYY-MM-DD) for daily reset
         karakeepUrl: text('karakeep_url'),
         karakeepApiKey: text('karakeep_api_key'),
         createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
@@ -196,6 +198,9 @@ export const messages = sqliteTable(
         tokenCount: integer('token_count'),
         images: text('images', { mode: 'json' }).$type<
             Array<{ url: string; storage_id: string; fileName?: string }>
+        >(),
+        documents: text('documents', { mode: 'json' }).$type<
+            Array<{ url: string; storage_id: string; fileName?: string; fileType: 'pdf' | 'markdown' | 'text' }>
         >(),
         costUsd: real('cost_usd'),
         generationId: text('generation_id'),
