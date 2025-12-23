@@ -59,9 +59,7 @@
 		await goto('/login');
 	}
 
-	const lastChat = useLastChat();
-
-	const backToChat = $derived(lastChat.current ? `/chat/${lastChat.current}` : '/chat');
+	const backToChat = '/chat';
 </script>
 
 <div class="container mx-auto max-w-[1200px] space-y-8 pt-6 pb-24">
