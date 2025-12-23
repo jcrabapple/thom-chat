@@ -43,7 +43,7 @@ const reqBodySchema = z
 		conversation_id: z.string().optional(),
 		web_search_enabled: z.boolean().optional(),
 		web_search_mode: z.enum(['off', 'standard', 'deep']).optional(),
-		web_search_provider: z.enum(['linkup', 'tavily']).optional(),
+		web_search_provider: z.enum(['linkup', 'tavily', 'exa']).optional(),
 		images: z
 			.array(
 				z.object({
@@ -207,7 +207,7 @@ async function generateAIResponse({
 	abortSignal?: AbortSignal;
 	reasoningEffort?: 'low' | 'medium' | 'high';
 	webSearchDepth?: 'standard' | 'deep';
-	webSearchProvider?: 'linkup' | 'tavily';
+	webSearchProvider?: 'linkup' | 'tavily' | 'exa';
 }) {
 	log('Starting AI response generation in background', startTime);
 
@@ -228,15 +228,20 @@ async function generateAIResponse({
 	const lastUserMessage = conversationMessages.filter((m) => m.role === 'user').pop();
 	const webSearchEnabled = lastUserMessage?.webSearchEnabled ?? false;
 
-	// Determine if we're using Tavily (model suffix) or Linkup (separate API)
+	// Determine if we're using Tavily or Exa (model suffix) or Linkup (separate API)
 	const useTavily = webSearchEnabled && webSearchProvider === 'tavily';
+	const useExa = webSearchEnabled && webSearchProvider === 'exa';
 
-	// When using Tavily, append the suffix to the model ID
+	// When using Tavily or Exa, append the suffix to the model ID
 	let modelId = model.modelId;
 	if (useTavily && webSearchDepth) {
 		const tavilySuffix = webSearchDepth === 'deep' ? ':online/tavily-deep' : ':online/tavily';
 		modelId = `${model.modelId}${tavilySuffix}`;
 		log(`Background: Using Tavily web search via model suffix: ${modelId}`, startTime);
+	} else if (useExa && webSearchDepth) {
+		const exaSuffix = webSearchDepth === 'deep' ? ':online/exa-deep' : ':online/exa-fast';
+		modelId = `${model.modelId}${exaSuffix}`;
+		log(`Background: Using Exa web search via model suffix: ${modelId}`, startTime);
 	}
 
 	// Fetch persistent memory if enabled
@@ -254,7 +259,7 @@ async function generateAIResponse({
 		}
 	}
 
-	// Perform web search if enabled (only for Linkup, Tavily uses model suffix)
+	// Perform web search if enabled (only for Linkup, Tavily and Exa use model suffix)
 	let searchContext: string | null = null;
 	let webSearchCost = 0;
 
@@ -265,7 +270,14 @@ async function generateAIResponse({
 		log(`Background: Tavily web search cost: $${webSearchCost}`, startTime);
 	}
 
-	if (webSearchEnabled && lastUserMessage && !useTavily) {
+	// Track Exa search cost (handled via model suffix, but we still track the cost)
+	if (useExa && webSearchDepth) {
+		// Exa pricing: Deep search $0.015, Fast search $0.005
+		webSearchCost = webSearchDepth === 'deep' ? 0.015 : 0.005;
+		log(`Background: Exa web search cost: $${webSearchCost}`, startTime);
+	}
+
+	if (webSearchEnabled && lastUserMessage && !useTavily && !useExa) {
 		log('Background: Performing Linkup web search', startTime);
 		try {
 			const depth = webSearchDepth ?? 'standard';

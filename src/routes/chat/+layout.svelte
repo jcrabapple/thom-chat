@@ -55,14 +55,17 @@
 	let textarea = $state<HTMLTextAreaElement>();
 	let abortController = $state<AbortController | null>(null);
 
-
 	$effect(() => {
 		// Enable initial models for new users
-		mutate(api.user_enabled_models.enable_initial.url, {
-			action: 'enableInitial',
-		}, {
-			invalidatePatterns: [api.user_enabled_models.get_enabled.url]
-		});
+		mutate(
+			api.user_enabled_models.enable_initial.url,
+			{
+				action: 'enableInitial',
+			},
+			{
+				invalidatePatterns: [api.user_enabled_models.get_enabled.url],
+			}
+		);
 	});
 
 	const assistantsQuery = useCachedQuery(api.assistants.list, {
@@ -88,23 +91,25 @@
 
 	// Apply assistant defaults when switching assistants
 	let previousAssistantId = $state<string | null>(null);
-	
+
 	$effect(() => {
 		const currentId = selectedAssistantId.current;
 		const assistant = selectedAssistant;
-		
+
 		// Only apply defaults when actually switching to a different assistant
 		if (currentId && currentId !== previousAssistantId && assistant) {
 			previousAssistantId = currentId;
-			
+
 			// Apply model if configured (don't reset model if not configured)
 			if (assistant.defaultModelId) {
 				settings.modelId = assistant.defaultModelId;
 			}
-			
+
 			// Apply search settings - reset to defaults if not configured
-			settings.webSearchMode = (assistant.defaultWebSearchMode as 'off' | 'standard' | 'deep') || 'off';
-			settings.webSearchProvider = (assistant.defaultWebSearchProvider as 'linkup' | 'tavily') || 'linkup';
+			settings.webSearchMode =
+				(assistant.defaultWebSearchMode as 'off' | 'standard' | 'deep') || 'off';
+			settings.webSearchProvider =
+				(assistant.defaultWebSearchProvider as 'linkup' | 'tavily' | 'exa') || 'linkup';
 		}
 	});
 
@@ -113,8 +118,8 @@
 	}));
 
 	const isGenerating = $derived(
-		Boolean(currentConversationQuery.data?.generating) || 
-		(page.params.id ? currentConversationQuery.isLoading : false)
+		Boolean(currentConversationQuery.data?.generating) ||
+			(page.params.id ? currentConversationQuery.isLoading : false)
 	);
 
 	async function stopGeneration() {
@@ -205,7 +210,6 @@
 			message.current = '';
 		}
 	}
-
 
 	let abortEnhance: AbortController | null = $state(null);
 
@@ -494,10 +498,7 @@
 
 <svelte:head>
 	<title>Chat | not t3.chat</title>
-	<meta
-		name="viewport"
-		content="width=device-width, initial-scale=1, viewport-fit=cover"
-	/>
+	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 </svelte:head>
 
 <svelte:window
@@ -512,7 +513,7 @@
 	<AppSidebar bind:searchModalOpen />
 
 	<Sidebar.Inset
-		class="bg-background relative flex min-h-svh flex-1 flex-col overflow-clip md:m-2 md:rounded-2xl md:border md:border-border"
+		class="bg-background md:border-border relative flex min-h-svh flex-1 flex-col overflow-clip md:m-2 md:rounded-2xl md:border"
 	>
 		{#if !sidebarOpen}
 			<!-- header - top left -->
@@ -604,14 +605,16 @@
 			</div>
 
 			<div
-				class="group absolute bottom-4 left-0 right-0 mx-auto mt-auto flex w-full max-w-3xl flex-col gap-1 px-4"
+				class="group absolute right-0 bottom-4 left-0 mx-auto mt-auto flex w-full max-w-3xl flex-col gap-1 px-4"
 				bind:this={textareaWrapper}
 			>
-				<div class="mb-2 text-center text-[10px] text-muted-foreground/60">
-					Powered by <a href="https://nano-gpt.com" class="underline hover:text-foreground">Nano-GPT</a>
+				<div class="text-muted-foreground/60 mb-2 text-center text-[10px]">
+					Powered by <a href="https://nano-gpt.com" class="hover:text-foreground underline"
+						>Nano-GPT</a
+					>
 				</div>
 				<div
-					class="bg-secondary/40 rounded-2xl p-2.5 backdrop-blur-xl border border-border shadow-2xl"
+					class="bg-secondary/40 border-border rounded-2xl border p-2.5 shadow-2xl backdrop-blur-xl"
 				>
 					<form
 						class="relative flex w-full flex-col items-stretch gap-2 transition duration-200"
@@ -686,7 +689,7 @@
 											<button
 												type="button"
 												onclick={() => removeImage(index)}
-												class="bg-destructive text-destructive-foreground absolute -top-1.5 -right-1.5 cursor-pointer rounded-full p-1 opacity-0 transition group-hover:opacity-100 shadow-sm"
+												class="bg-destructive text-destructive-foreground absolute -top-1.5 -right-1.5 cursor-pointer rounded-full p-1 opacity-0 shadow-sm transition group-hover:opacity-100"
 											>
 												<XIcon class="h-3 w-3" />
 											</button>
@@ -753,7 +756,9 @@
 												class="bg-secondary/50 hover:bg-secondary text-muted-foreground flex h-9 items-center justify-center gap-2 rounded-lg px-2.5 transition-colors"
 											>
 												<BotIcon class="size-4" />
-												<span class="text-sm max-w-[100px] truncate">{selectedAssistant?.name ?? 'Assistant'}</span>
+												<span class="max-w-[100px] truncate text-sm"
+													>{selectedAssistant?.name ?? 'Assistant'}</span
+												>
 											</DropdownMenu.Trigger>
 											<DropdownMenu.Content>
 												<DropdownMenu.Group>
@@ -783,22 +788,33 @@
 													type="button"
 													class={cn(
 														'bg-secondary/50 hover:bg-secondary text-muted-foreground relative flex size-8 items-center justify-center rounded-lg transition-colors',
-														settings.webSearchMode === 'standard' && 'bg-primary/20 text-primary border-primary/50', settings.webSearchMode === 'deep' && 'bg-amber-500/20 text-amber-500 border-amber-500/50'
+														settings.webSearchMode === 'standard' &&
+															'bg-primary/20 text-primary border-primary/50',
+														settings.webSearchMode === 'deep' &&
+															'border-amber-500/50 bg-amber-500/20 text-amber-500'
 													)}
 													onclick={() => {
-														if (settings.webSearchMode === 'off') settings.webSearchMode = 'standard';
-														else if (settings.webSearchMode === 'standard') settings.webSearchMode = 'deep';
+														if (settings.webSearchMode === 'off')
+															settings.webSearchMode = 'standard';
+														else if (settings.webSearchMode === 'standard')
+															settings.webSearchMode = 'deep';
 														else settings.webSearchMode = 'off';
 													}}
 													{...tooltip.trigger}
 												>
 													<SearchIcon class="size-4" />
 													{#if settings.webSearchMode === 'deep'}
-														<span class="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-amber-500"></span>
+														<span
+															class="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-amber-500"
+														></span>
 													{/if}
 												</button>
 											{/snippet}
-											{settings.webSearchMode === 'off' ? 'Web Search: Off' : settings.webSearchMode === 'standard' ? 'Web Search: Standard ($0.006)' : 'Web Search: Deep ($0.06)'}
+											{settings.webSearchMode === 'off'
+												? 'Web Search: Off'
+												: settings.webSearchMode === 'standard'
+													? 'Web Search: Standard ($0.006)'
+													: 'Web Search: Deep ($0.06)'}
 										</Tooltip>
 										{#if settings.webSearchMode !== 'off'}
 											<Tooltip>
@@ -807,17 +823,29 @@
 														type="button"
 														class={cn(
 															'bg-secondary/50 hover:bg-secondary text-muted-foreground flex h-8 items-center justify-center rounded-lg px-2 text-xs font-medium transition-colors',
-															settings.webSearchProvider === 'tavily' && 'bg-purple-500/20 text-purple-400'
+															settings.webSearchProvider === 'tavily' &&
+																'bg-purple-500/20 text-purple-400',
+															settings.webSearchProvider === 'exa' && 'bg-blue-500/20 text-blue-400'
 														)}
 														onclick={() => {
-															settings.webSearchProvider = settings.webSearchProvider === 'linkup' ? 'tavily' : 'linkup';
+														if (settings.webSearchProvider === 'linkup') settings.webSearchProvider = 'tavily';
+														else if (settings.webSearchProvider === 'tavily') settings.webSearchProvider = 'exa';
+														else settings.webSearchProvider = 'linkup';
 														}}
 														{...tooltip.trigger}
 													>
-														{settings.webSearchProvider === 'linkup' ? 'Linkup' : 'Tavily'}
+														{settings.webSearchProvider === 'linkup'
+															? 'Linkup'
+															: settings.webSearchProvider === 'tavily'
+																? 'Tavily'
+																: 'Exa'}
 													</button>
 												{/snippet}
-												{settings.webSearchProvider === 'linkup' ? 'Using Linkup (default). Click to switch to Tavily.' : 'Using Tavily. Click to switch to Linkup.'}
+												{settings.webSearchProvider === 'linkup'
+													? 'Using Linkup (default). Click to switch.'
+													: settings.webSearchProvider === 'tavily'
+														? 'Using Tavily. Click to switch.'
+														: 'Using Exa. Click to switch.'}
 											</Tooltip>
 										{/if}
 										{#if currentModelSupportsImages}
@@ -841,9 +869,12 @@
 												type="button"
 												class={cn(
 													'bg-secondary/50 hover:bg-secondary text-muted-foreground flex size-8 items-center justify-center rounded-lg transition-colors',
-													settings.reasoningEffort !== 'low' && 'bg-primary/20 text-primary border-primary/50'
+													settings.reasoningEffort !== 'low' &&
+														'bg-primary/20 text-primary border-primary/50'
 												)}
-												onclick={() => (settings.reasoningEffort = settings.reasoningEffort === 'low' ? 'medium' : 'low')}
+												onclick={() =>
+													(settings.reasoningEffort =
+														settings.reasoningEffort === 'low' ? 'medium' : 'low')}
 											>
 												<BrainIcon class="size-4" />
 											</button>
@@ -857,7 +888,7 @@
 												type={isGenerating ? 'button' : 'submit'}
 												onclick={isGenerating ? stopGeneration : undefined}
 												disabled={isGenerating ? false : !message.current.trim()}
-												class="bg-primary text-primary-foreground hover:opacity-90 active:scale-95 flex size-8 items-center justify-center rounded-lg shadow-lg transition-all disabled:cursor-not-allowed disabled:opacity-50 disabled:scale-100"
+												class="bg-primary text-primary-foreground flex size-8 items-center justify-center rounded-lg shadow-lg transition-all hover:opacity-90 active:scale-95 disabled:scale-100 disabled:cursor-not-allowed disabled:opacity-50"
 												{...tooltip.trigger}
 											>
 												{#if isGenerating}
@@ -875,8 +906,6 @@
 					</form>
 				</div>
 			</div>
-
-
 		</div>
 	</Sidebar.Inset>
 
