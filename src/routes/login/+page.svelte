@@ -66,8 +66,8 @@
 				fetchOptions: {
 					onSuccess: () => {
 						window.location.href = '/chat';
-					}
-				}
+					},
+				},
 			});
 			if (result?.error) {
 				error = result.error.message || 'Sign in failed';
@@ -87,15 +87,15 @@
 </script>
 
 <div class="flex h-svh flex-col place-items-center justify-center gap-6">
-	<h1 class="text-2xl font-bold">Sign in to not t3.chat</h1>
-	
+	<h1 class="text-2xl font-bold">Sign in to nanochat</h1>
+
 	<div class="w-full max-w-sm space-y-4">
 		<div class="grid w-full items-center gap-1.5">
 			<Label for="username">Username</Label>
-			<Input 
-				type="text" 
-				id="username" 
-				placeholder="username" 
+			<Input
+				type="text"
+				id="username"
+				placeholder="username"
 				bind:value={username}
 				onkeydown={handleKeyDown}
 			/>
@@ -103,17 +103,17 @@
 
 		<div class="grid w-full items-center gap-1.5">
 			<Label for="password">Password</Label>
-			<Input 
-				type="password" 
-				id="password" 
-				placeholder="••••••••" 
+			<Input
+				type="password"
+				id="password"
+				placeholder="••••••••"
 				bind:value={password}
 				onkeydown={handleKeyDown}
 			/>
 		</div>
 
 		{#if error}
-			<p class="text-sm text-destructive">{error}</p>
+			<p class="text-destructive text-sm">{error}</p>
 		{/if}
 
 		<div class="flex flex-col gap-2 pt-2">
@@ -121,7 +121,11 @@
 				{isLoading ? 'Loading...' : 'Sign In'}
 			</Button>
 			{#if !data.signupsDisabled}
-				<Button variant="outline" onclick={handleSignUp} disabled={isLoading || !username || !password}>
+				<Button
+					variant="outline"
+					onclick={handleSignUp}
+					disabled={isLoading || !username || !password}
+				>
 					Create Account
 				</Button>
 			{/if}
@@ -132,7 +136,7 @@
 				<span class="w-full border-t"></span>
 			</div>
 			<div class="relative flex justify-center text-xs uppercase">
-				<span class="bg-background px-2 text-muted-foreground"> Or continue with </span>
+				<span class="bg-background text-muted-foreground px-2"> Or continue with </span>
 			</div>
 		</div>
 
@@ -140,7 +144,7 @@
 			Passkey
 		</Button>
 
-		<p class="text-center text-xs text-muted-foreground pt-2">
+		<p class="text-muted-foreground pt-2 text-center text-xs">
 			You can add a passkey for passwordless login in your account settings after signing in.
 		</p>
 	</div>

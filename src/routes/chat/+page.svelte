@@ -71,20 +71,18 @@
 </script>
 
 <svelte:head>
-	<title>T3.chat</title>
+	<title>nanochat</title>
 </svelte:head>
 
-<div class="flex h-svh flex-col items-center justify-center -translate-y-10">
+<div class="flex h-svh -translate-y-10 flex-col items-center justify-center">
 	{#if prompt.current.length === 0 && nanoGPTKeyQuery.data}
 		<div class="w-full max-w-2xl px-4 text-center" in:scale={{ duration: 500, start: 0.9 }}>
-			<h1 class="font-sans text-4xl font-bold tracking-tight mb-8">
-				How can I help you?
-			</h1>
+			<h1 class="mb-8 font-sans text-4xl font-bold tracking-tight">How can I help you?</h1>
 			<div class="mt-4 flex flex-wrap items-center justify-center gap-2">
 				{#each Object.entries(suggestionCategories) as [category, opts] (category)}
 					<button
 						type="button"
-						class="data-[active=true]:bg-primary data-[active=true]:text-primary-foreground focus-visible:border-ring focus-visible:ring-ring/50 bg-secondary/50 border border-border relative inline-flex h-10 shrink-0 items-center justify-center gap-2 overflow-hidden rounded-full px-5 py-2 text-sm font-semibold whitespace-nowrap outline-hidden transition-all select-none hover:bg-secondary hover:cursor-pointer focus-visible:ring-[3px] disabled:pointer-events-none disabled:opacity-50"
+						class="data-[active=true]:bg-primary data-[active=true]:text-primary-foreground focus-visible:border-ring focus-visible:ring-ring/50 bg-secondary/50 border-border hover:bg-secondary relative inline-flex h-10 shrink-0 items-center justify-center gap-2 overflow-hidden rounded-full border px-5 py-2 text-sm font-semibold whitespace-nowrap outline-hidden transition-all select-none hover:cursor-pointer focus-visible:ring-[3px] disabled:pointer-events-none disabled:opacity-50"
 						data-active={selectedCategory === category}
 						onclick={() => {
 							if (selectedCategory === category) {
@@ -102,22 +100,22 @@
 
 			<div class="mt-8 flex w-full flex-col items-center">
 				{#if selectedCategory && suggestionCategories[selectedCategory]}
-					<div class="flex w-full max-w-xl flex-col divide-y divide-border/50">
+					<div class="divide-border/50 flex w-full max-w-xl flex-col divide-y">
 						{#each suggestionCategories[selectedCategory]?.suggestions ?? [] as suggestion (suggestion)}
 							<button
 								onclick={() => (prompt.current = suggestion)}
-								class="w-full cursor-pointer px-4 py-4 text-center text-base text-muted-foreground transition-all hover:bg-secondary/30 hover:text-foreground"
+								class="text-muted-foreground hover:bg-secondary/30 hover:text-foreground w-full cursor-pointer px-4 py-4 text-center text-base transition-all"
 							>
 								{suggestion}
 							</button>
 						{/each}
 					</div>
 				{:else}
-					<div class="flex w-full max-w-xl flex-col divide-y divide-border/50">
+					<div class="divide-border/50 flex w-full max-w-xl flex-col divide-y">
 						{#each defaultSuggestions as suggestion}
 							<button
 								onclick={() => (prompt.current = suggestion)}
-								class="w-full cursor-pointer px-4 py-4 text-center text-base text-muted-foreground transition-all hover:bg-secondary/30 hover:text-foreground"
+								class="text-muted-foreground hover:bg-secondary/30 hover:text-foreground w-full cursor-pointer px-4 py-4 text-center text-base transition-all"
 							>
 								{suggestion}
 							</button>
@@ -128,9 +126,7 @@
 		</div>
 	{:else if !nanoGPTKeyQuery.data && !nanoGPTKeyQuery.isLoading}
 		<div class="w-full max-w-2xl px-4 py-12 text-center" in:scale={{ duration: 500, start: 0.9 }}>
-			<h1 class="font-sans text-4xl font-bold tracking-tight mb-4">
-				How can I help you?
-			</h1>
+			<h1 class="mb-4 font-sans text-4xl font-bold tracking-tight">How can I help you?</h1>
 			<p class="text-muted-foreground mb-8 text-lg">
 				You can send some free messages, or provide a key for limitless access.
 			</p>

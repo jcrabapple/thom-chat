@@ -33,7 +33,7 @@
 
 <svelte:head>
 	<title>{conversationQuery.data?.title || 'Shared Chat'} | Shared Chat</title>
-	<meta name="description" content="A shared conversation from not t3.chat" />
+	<meta name="description" content="A shared conversation from nanochat" />
 </svelte:head>
 
 <div class="fill-device-height">
@@ -47,7 +47,7 @@
 					href="/"
 					class="text-foreground hover:text-foreground/80 flex items-center gap-2 transition-colors"
 				>
-					<span class="font-serif font-semibold">not t3.chat</span>
+					<span class="font-serif font-semibold">nanochat</span>
 				</a>
 				<div class="text-muted-foreground text-sm">Shared conversation</div>
 			</div>
@@ -118,7 +118,7 @@
 			>
 				<div class="flex items-center gap-4">
 					<a
-						href="https://github.com/0xgingi/thom-chat"
+						href="https://github.com/0xgingi/nanochat"
 						class="hover:text-foreground flex items-center gap-1 transition-colors"
 					>
 						Source on <GitHub class="inline size-3" />

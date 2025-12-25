@@ -98,7 +98,7 @@
 </script>
 
 <svelte:head>
-	<title>{conversation.data?.title} | not t3.chat</title>
+	<title>{conversation.data?.title} | nanochat</title>
 </svelte:head>
 
 <div class="flex h-full flex-1 flex-col py-4 pt-6">

@@ -50,11 +50,11 @@
 </script>
 
 <svelte:head>
-	<title>Customization | not t3.chat</title>
+	<title>Customization | nanochat</title>
 </svelte:head>
 
 <h1 class="text-2xl font-bold">Customization</h1>
-<h2 class="text-muted-foreground mt-2 text-sm">Customize your experience with not t3.chat.</h2>
+<h2 class="text-muted-foreground mt-2 text-sm">Customize your experience with nanochat.</h2>
 
 <div class="mt-8 flex flex-col gap-4">
 	<div class="flex place-items-center justify-between">

@@ -43,7 +43,7 @@
 </script>
 
 <svelte:head>
-	<title>API Keys | not t3.chat</title>
+	<title>API Keys | nanochat</title>
 </svelte:head>
 
 <div>

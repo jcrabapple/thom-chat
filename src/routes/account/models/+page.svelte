@@ -18,9 +18,7 @@
 		provider: Provider.NanoGPT,
 	});
 
-	const hasNanoGPTKey = $derived(
-		nanoGPTKeyQuery.data !== undefined && nanoGPTKeyQuery.data !== ''
-	);
+	const hasNanoGPTKey = $derived(nanoGPTKeyQuery.data !== undefined && nanoGPTKeyQuery.data !== '');
 
 	let search = $state('');
 
@@ -33,10 +31,6 @@
 	const subscriptionToggle = new Toggle({
 		value: false,
 	});
-
-
-
-
 
 	let initiallyEnabled = $state<string[]>([]);
 	$effect(() => {
@@ -70,7 +64,7 @@
 </script>
 
 <svelte:head>
-	<title>Models | not t3.chat</title>
+	<title>Models | nanochat</title>
 </svelte:head>
 
 <h1 class="text-2xl font-bold">Available Models</h1>
@@ -93,7 +87,7 @@
 		<button
 			{...subscriptionToggle.trigger}
 			aria-label="Subscription Only"
-			class="group text-primary-foreground bg-yellow-500 aria-[pressed=false]:border-border border-yellow-500 aria-[pressed=false]:bg-background aria-[pressed=false]:text-foreground flex place-items-center gap-1 rounded-full border px-2 py-1 text-xs transition-all"
+			class="group text-primary-foreground aria-[pressed=false]:border-border aria-[pressed=false]:bg-background aria-[pressed=false]:text-foreground flex place-items-center gap-1 rounded-full border border-yellow-500 bg-yellow-500 px-2 py-1 text-xs transition-all"
 		>
 			<TicketIcon class="inline size-3" />
 			Subscription
@@ -110,18 +104,15 @@
 			<p class="text-muted-foreground text-sm">Access to premium models via NanoGPT.</p>
 			{#if !hasNanoGPTKey}
 				<p class="text-muted-foreground mt-1 text-xs">
-					<a href="/account/api-keys#nanogpt" class="text-primary underline">Add an API key</a> to get started.
+					<a href="/account/api-keys#nanogpt" class="text-primary underline">Add an API key</a> to get
+					started.
 				</p>
 			{/if}
 		</div>
 		<div class="relative">
 			<div class="flex flex-col gap-4 overflow-hidden">
 				{#each nanoGPTModels as model (model.id)}
-					<ModelCard
-						provider={Provider.NanoGPT}
-						{model}
-						enabled={model.enabled}
-					/>
+					<ModelCard provider={Provider.NanoGPT} {model} enabled={model.enabled} />
 				{/each}
 			</div>
 		</div>

@@ -236,7 +236,7 @@
 </script>
 
 <svelte:head>
-	<title>Account | not t3.chat</title>
+	<title>Account | nanochat</title>
 </svelte:head>
 
 <h1 class="text-2xl font-bold">Account Settings</h1>

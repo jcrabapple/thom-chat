@@ -167,7 +167,7 @@
 				Toggle Sidebar ({cmdOrCtrl} + B)
 			</Tooltip>
 		</div>
-		<span class="text-center font-sans text-xl font-bold tracking-tight">T3.chat</span>
+		<span class="text-center font-sans text-xl font-bold tracking-tight">nanochat</span>
 		<div class="size-9"></div>
 	</div>
 	<div class="mt-2 flex w-full flex-col gap-2 px-2">
